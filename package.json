@@ -1,0 +1,15 @@
+{
+  "name": "lrucache-x",
+  "version": "1.0.0",
+  "description": "Zero-dep LRU cache with TTL, max size, eviction callbacks, and stats",
+  "type": "module",
+  "main": "src/index.mjs",
+  "bin": {
+    "lrucache-x": "cli.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/index.test.mjs"
+  },
+  "keywords": ["lru", "cache", "ttl", "eviction", "zero-dependency"],
+  "license": "MIT"
+}
