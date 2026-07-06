@@ -10,6 +10,21 @@
   "scripts": {
     "test": "node --test test/index.test.mjs"
   },
-  "keywords": ["lru", "cache", "ttl", "eviction", "zero-dependency"],
-  "license": "MIT"
+  "keywords": [
+    "lru",
+    "cache",
+    "ttl",
+    "eviction",
+    "zero-dependency"
+  ],
+  "license": "MIT",
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sulthonzh/lrucache-x.git"
+  }
 }
