@@ -294,3 +294,234 @@ describe('Multiple evictions', () => {
     assert.equal(c.has('e'), true);
   });
 });
+
+describe('has() lazy eviction', () => {
+  it('has() evicts expired keys and returns false', async () => {
+    const evicted = [];
+    const c = createCache({ onEvict: (k, v, reason) => evicted.push({ k, v, reason }) });
+    c.set('a', 1, { ttl: 30 });
+    await new Promise(r => setTimeout(r, 40));
+    assert.equal(c.has('a'), false);
+    assert.deepEqual(evicted, [{ k: 'a', v: 1, reason: 'expired' }]);
+  });
+
+  it('has() does not evict non-expired keys', () => {
+    const c = createCache({ ttl: 1000 });
+    c.set('a', 1);
+    assert.equal(c.has('a'), true);
+    assert.equal(c.size(), 1);
+  });
+});
+
+describe('set() return value', () => {
+  it('returns true for new key', () => {
+    const c = createCache();
+    assert.equal(c.set('a', 1), true);
+  });
+
+  it('returns false for existing key', () => {
+    const c = createCache();
+    c.set('a', 1);
+    assert.equal(c.set('a', 2), false);
+  });
+});
+
+describe('peek() with expired keys', () => {
+  it('peek() evicts expired keys and returns undefined', async () => {
+    const evicted = [];
+    const c = createCache({ onEvict: (k, v, reason) => evicted.push({ k, v, reason }) });
+    c.set('a', 1, { ttl: 30 });
+    await new Promise(r => setTimeout(r, 40));
+    assert.equal(c.peek('a'), undefined);
+    assert.equal(c.size(), 0);
+    assert.deepEqual(evicted, [{ k: 'a', v: 1, reason: 'expired' }]);
+  });
+});
+
+describe('del() and clear() behavior', () => {
+  it('del() does not fire onEvict', () => {
+    const evicted = [];
+    const c = createCache({ onEvict: (k, v, reason) => evicted.push({ k, v, reason }) });
+    c.set('a', 1);
+    c.del('a');
+    assert.equal(evicted.length, 0);
+  });
+
+  it('clear() does not fire onEvict', () => {
+    const evicted = [];
+    const c = createCache({ onEvict: (k, v, reason) => evicted.push({ k, v, reason }) });
+    c.set('a', 1);
+    c.set('b', 2);
+    c.clear();
+    assert.equal(evicted.length, 0);
+  });
+
+  it('clear() resets expirations map', async () => {
+    const c = createCache();
+    c.set('a', 1, { ttl: 30 });
+    c.clear();
+    c.set('b', 2);
+    await new Promise(r => setTimeout(r, 40));
+    assert.equal(c.get('b'), 2);
+    assert.equal(c.size(), 1);
+  });
+});
+
+describe('TTL edge cases', () => {
+  it('set with ttl=0 on cache with default ttl means no expiration', async () => {
+    const c = createCache({ ttl: 50 });
+    c.set('a', 1);            // uses default 50ms
+    c.set('b', 2, { ttl: 0 }); // overrides: no expiration
+    await new Promise(r => setTimeout(r, 60));
+    assert.equal(c.get('a'), undefined);
+    assert.equal(c.get('b'), 2);
+  });
+
+  it('set with ttl=0 removes existing expiration', async () => {
+    const c = createCache();
+    c.set('a', 1, { ttl: 1000 });
+    c.set('a', 2, { ttl: 0 }); // update: remove TTL
+    await new Promise(r => setTimeout(r, 10));
+    assert.equal(c.get('a'), 2);
+  });
+
+  it('purgeExpired with no expirations map returns 0', () => {
+    const c = createCache({ ttl: 0 });
+    c.set('a', 1);
+    assert.equal(c.purgeExpired(), 0);
+  });
+
+  it('purgeExpired fires onEvict with expired reason', async () => {
+    const evicted = [];
+    const c = createCache({ onEvict: (k, v, reason) => evicted.push({ k, v, reason }) });
+    c.set('a', 1, { ttl: 30 });
+    c.set('b', 2, { ttl: 30 });
+    c.set('c', 3); // no ttl
+    await new Promise(r => setTimeout(r, 40));
+    const purged = c.purgeExpired();
+    assert.equal(purged, 2);
+    assert.equal(evicted.length, 2);
+    assert.equal(evicted.every(e => e.reason === 'expired'), true);
+  });
+});
+
+describe('getOrSet edge cases', () => {
+  it('getOrSet with opts passes ttl', async () => {
+    const c = createCache();
+    c.getOrSet('a', () => 1, { ttl: 30 });
+    assert.equal(c.get('a'), 1);
+    await new Promise(r => setTimeout(r, 40));
+    assert.equal(c.get('a'), undefined);
+  });
+
+  it('getOrSet does not cache undefined factory result', () => {
+    const c = createCache();
+    let calls = 0;
+    c.getOrSet('x', () => { calls++; return undefined; });
+    c.getOrSet('x', () => { calls++; return undefined; });
+    assert.equal(calls, 2);
+  });
+});
+
+describe('Stats edge cases', () => {
+  it('tracks deletes', () => {
+    const c = createCache({ trackStats: true });
+    c.set('a', 1);
+    c.del('a');
+    assert.equal(c.getStats().deletes, 1);
+  });
+
+  it('tracks expirations separately from evictions', async () => {
+    const c = createCache({ max: 2, trackStats: true });
+    c.set('a', 1, { ttl: 30 });
+    c.set('b', 2);
+    await new Promise(r => setTimeout(r, 40));
+    c.get('a'); // triggers expiration
+    const s = c.getStats();
+    assert.equal(s.expirations, 1);
+    assert.equal(s.evictions, 1); // expiration also counts as eviction
+  });
+
+  it('getStats includes size and maxSize', () => {
+    const c = createCache({ max: 10, trackStats: true });
+    c.set('a', 1);
+    c.set('b', 2);
+    const s = c.getStats();
+    assert.equal(s.size, 2);
+    assert.equal(s.maxSize, 10);
+  });
+
+  it('hitRate is 0 when no operations', () => {
+    const c = createCache({ trackStats: true });
+    assert.equal(c.getStats().hitRate, 0);
+  });
+
+  it('resetStats does not reset size', () => {
+    const c = createCache({ max: 10, trackStats: true });
+    c.set('a', 1);
+    c.resetStats();
+    assert.equal(c.getStats().size, 1);
+  });
+});
+
+describe('Empty cache operations', () => {
+  it('keys() returns empty array', () => {
+    const c = createCache();
+    assert.deepEqual(c.keys(), []);
+  });
+
+  it('entries() returns empty array', () => {
+    const c = createCache();
+    assert.deepEqual(c.entries(), []);
+  });
+
+  it('del() on empty cache returns false', () => {
+    const c = createCache();
+    assert.equal(c.del('nope'), false);
+  });
+
+  it('clear() on empty cache returns 0', () => {
+    const c = createCache();
+    assert.equal(c.clear(), 0);
+  });
+
+  it('purgeExpired() on empty cache returns 0', () => {
+    const c = createCache();
+    assert.equal(c.purgeExpired(), 0);
+  });
+});
+
+describe('Eviction with onEvict', () => {
+  it('onEvict receives correct value on LRU eviction', () => {
+    const evicted = [];
+    const c = createCache({ max: 2, onEvict: (k, v, reason) => evicted.push({ k, v, reason }) });
+    c.set('a', 1);
+    c.set('b', 2);
+    c.set('c', 3); // evict 'a'
+    assert.deepEqual(evicted, [{ k: 'a', v: 1, reason: 'evicted' }]);
+  });
+});
+
+describe('Large cache stress', () => {
+  it('handles 10000 entries', () => {
+    const c = createCache({ max: 10000 });
+    for (let i = 0; i < 10000; i++) {
+      c.set(`key-${i}`, i);
+    }
+    assert.equal(c.size(), 10000);
+    assert.equal(c.get('key-5000'), 5000);
+  });
+
+  it('eviction under stress maintains order', () => {
+    const c = createCache({ max: 100 });
+    for (let i = 0; i < 200; i++) {
+      c.set(`key-${i}`, i);
+    }
+    assert.equal(c.size(), 100);
+    // oldest 100 should be evicted
+    assert.equal(c.has('key-0'), false);
+    assert.equal(c.has('key-99'), false);
+    assert.equal(c.has('key-100'), true);
+    assert.equal(c.has('key-199'), true);
+  });
+});

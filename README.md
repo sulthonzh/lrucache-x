@@ -151,6 +151,20 @@ No custom doubly-linked list. No pointer juggling. Just `Map.delete()` + `Map.se
 
 TTL is lazy: expired entries are cleaned up on access (`get`, `has`, `peek`). Use `purgeExpired()` for eager cleanup.
 
+## Comparison
+
+| Feature | lrucache-x | lru-cache | quick-lru | hashlru |
+|---------|-----------|----------|-----------|--------|
+| Dependencies | **0** | 0 | 0 | 0 |
+| TTL support | ✅ per-entry + default | ✅ per-entry | ❌ | ❌ |
+| Eviction callbacks | ✅ | ✅ | ❌ | ✅ |
+| Stats tracking | ✅ hits/misses/evictions | ❌ | ❌ | ❌ |
+| `peek()` | ✅ | ✅ | ✅ | ❌ |
+| `getOrSet()` | ✅ built-in | ❌ | ❌ | ❌ |
+| `purgeExpired()` | ✅ eager cleanup | ❌ | N/A | N/A |
+| Code size | ~150 lines | ~500+ | ~100 | ~80 |
+| ESM | ✅ native .mjs | ✅ | ✅ | ❌ CJS |
+
 ## License
 
 MIT
