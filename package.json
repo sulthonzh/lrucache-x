@@ -26,5 +26,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/sulthonzh/lrucache-x.git"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.31.0"
   }
 }
