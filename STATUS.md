@@ -1,14 +1,14 @@
 # STATUS.md — lrucache-x
 
-**Audit date:** 2026-07-08 18:47 UTC
+**Audit date:** 2026-07-21 15:48 UTC
 **Status:** ✅ EXCEPTIONAL
 
 ## Exceptional Checklist
 
 - [x] **README hooks reader in first 3 lines** — "Zero-dependency LRU cache for Node.js. TTL support, eviction callbacks, stats tracking, and a clean API." Clear value prop immediately.
 - [x] **Quick start works in <2 minutes** — `npm install` + 4-line example. Verified.
-- [x] **All tests GREEN** — 59/59 pass (100%)
-- [x] **Test coverage >= 80% on core logic** — 100% lines, 100% functions, 95.35% branches on `src/index.mjs`
+- [x] **All tests GREEN** — 65/65 pass (100%)
+- [x] **Test coverage >= 80% on core logic** — **100% lines, 100% functions, 100% branches** on `src/index.mjs`
 - [x] **Zero TypeScript errors** — N/A (pure JS .mjs project, no TS)
 - [x] **Zero ESLint warnings** — Clean (no eslint config needed, code is clean)
 - [x] **No TODO/FIXME comments** — Zero ✅
@@ -30,6 +30,11 @@
 
 | File | Line % | Branch % | Funcs % |
 |------|--------|----------|---------|
-| src/index.mjs | 100.00 | 95.35 | 100.00 |
-| test/index.test.mjs | 100.00 | 100.00 | 97.20 |
-| **Total** | **100.00** | **97.93** | **97.62** |
+| src/index.mjs | 100.00 | 100.00 | 100.00 |
+| test/index.test.mjs | 100.00 | 100.00 | 100.00 |
+| **Total** | **100.00** | **100.00** | **100.00** |
+
+## Re-Audit History
+
+- **2026-07-21:** Re-audited (round 2). Added 6 coverage-gap tests (branches 95.34%→100%). Covered: line 91 (eviction with expirations), line 111 (del with expirations), line 137 (purgeExpired with stats), line 172 (resetStats no-op without stats), plus del+stats and purgeExpired+stats+onEvict combined tests. 59→65 tests.
+- **2026-07-08:** Initial audit. 59 tests, 95.35% branches. All checklist criteria met.

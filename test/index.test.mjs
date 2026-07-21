@@ -502,6 +502,77 @@ describe('Eviction with onEvict', () => {
   });
 });
 
+describe('Coverage: Branch Gap Closures (2026-07-21)', () => {
+  // Line 91: if (expirations) expirations.delete(oldestKey) inside set() eviction loop
+  it('eviction removes expiration entry when cache has TTL', () => {
+    const c = createCache({ max: 2, ttl: 1000 });
+    c.set('a', 1);
+    c.set('b', 2);
+    c.set('c', 3); // evict 'a' which has an expiration
+    assert.equal(c.has('a'), false);
+    assert.equal(c.has('b'), true);
+    assert.equal(c.has('c'), true);
+    // verify expired 'a' doesn't interfere — purge should only find 'b' and 'c' if time passes
+    assert.equal(c.purgeExpired(), 0); // none expired yet
+  });
+
+  // Line 111: if (expirations) expirations.delete(key) inside del()
+  it('del() removes expiration entry when cache has TTL', () => {
+    const c = createCache({ ttl: 1000 });
+    c.set('a', 1);
+    assert.equal(c.del('a'), true);
+    // re-set same key to verify old expiration was cleaned up
+    c.set('a', 2, { ttl: 0 });
+    assert.equal(c.get('a'), 2);
+  });
+
+  // Line 137: if (stats) { stats.expirations++; stats.evictions++; } inside purgeExpired()
+  it('purgeExpired() tracks stats when trackStats is enabled', async () => {
+    const c = createCache({ trackStats: true });
+    c.set('a', 1, { ttl: 30 });
+    c.set('b', 2, { ttl: 30 });
+    await new Promise(r => setTimeout(r, 40));
+    const purged = c.purgeExpired();
+    assert.equal(purged, 2);
+    const s = c.getStats();
+    assert.equal(s.expirations, 2);
+    assert.equal(s.evictions, 2);
+  });
+
+  // Line 172: if (!stats) return inside resetStats()
+  it('resetStats() is a no-op when stats tracking is disabled', () => {
+    const c = createCache();
+    c.set('a', 1);
+    c.resetStats(); // should not throw, should return undefined
+    assert.equal(c.getStats(), null); // stats still null
+    assert.equal(c.get('a'), 1); // cache still works
+  });
+
+  // Additional: del() with TTL + stats for full coverage of del() branches together
+  it('del() with TTL and stats tracks delete count', () => {
+    const c = createCache({ ttl: 1000, trackStats: true });
+    c.set('a', 1);
+    c.del('a');
+    const s = c.getStats();
+    assert.equal(s.deletes, 1);
+  });
+
+  // Additional: purgeExpired with stats + onEvict for combined branch coverage
+  it('purgeExpired() with stats and onEvict fires callback and tracks', async () => {
+    const evicted = [];
+    const c = createCache({
+      trackStats: true,
+      onEvict: (k, v, reason) => evicted.push({ k, v, reason })
+    });
+    c.set('x', 10, { ttl: 30 });
+    await new Promise(r => setTimeout(r, 40));
+    c.purgeExpired();
+    assert.equal(evicted.length, 1);
+    assert.deepEqual(evicted[0], { k: 'x', v: 10, reason: 'expired' });
+    assert.equal(c.getStats().expirations, 1);
+  });
+});
+
 describe('Large cache stress', () => {
   it('handles 10000 entries', () => {
     const c = createCache({ max: 10000 });
