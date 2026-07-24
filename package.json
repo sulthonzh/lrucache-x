@@ -29,5 +29,8 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
